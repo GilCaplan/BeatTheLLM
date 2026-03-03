@@ -297,6 +297,5 @@ python backend/visualize_telemetry.py --out ./out   # custom dir
 
 ---
 
-## License
+<img width="895" height="749" alt="image" src="https://github.com/user-attachments/assets/1290ec38-a367-4876-8c9b-12b2ebd740a7" />
 
-MIT
