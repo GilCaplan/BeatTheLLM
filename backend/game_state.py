@@ -319,6 +319,8 @@ class RoomManager:
         if len(pids) == 2:
             current = room.pass_and_play_turn
             room.pass_and_play_turn = pids[1] if current == pids[0] else pids[0]
+        # Give the incoming player a full fresh timer
+        room.time_remaining = DRAFTING_SECONDS
         return room
 
     def set_result(self, room_id: str, result: GameResult) -> Room:

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import RulesScreen from './RulesScreen.jsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -14,6 +15,7 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
   const [roomCode, setRoomCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showRules, setShowRules] = useState(false)
 
   // Room creation options
   const [playMode, setPlayMode] = useState('MULTIPLAYER') // 'MULTIPLAYER' | 'PASS_AND_PLAY' | 'SOLO'
@@ -164,8 +166,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex-1 py-2 text-sm tracking-widest uppercase transition-colors ${tab === t
-                    ? 'text-hacker-green border-b-2 border-hacker-green'
-                    : 'text-green-800 hover:text-green-600'
+                  ? 'text-hacker-green border-b-2 border-hacker-green'
+                  : 'text-green-800 hover:text-green-600'
                   }`}
               >
                 {t === 'create' ? '[ Create Room ]' : '[ Join Room ]'}
@@ -223,8 +225,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                       key={opt.value}
                       onClick={() => setPlayMode(opt.value)}
                       className={`flex-1 p-3 border text-left text-xs transition-all ${playMode === opt.value
-                          ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
-                          : 'border-green-900 text-green-700 hover:border-green-600'
+                        ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
+                        : 'border-green-900 text-green-700 hover:border-green-600'
                         }`}
                     >
                       <div className="font-bold mb-1">{opt.label}</div>
@@ -248,8 +250,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                           key={r.value}
                           onClick={() => setHumanRole(r.value)}
                           className={`flex-1 p-3 border text-left text-xs transition-all ${humanRole === r.value
-                              ? r.color
-                              : 'border-green-900 text-green-700 hover:border-green-600'
+                            ? r.color
+                            : 'border-green-900 text-green-700 hover:border-green-600'
                             }`}
                         >
                           <div className="font-bold mb-1">{r.label}</div>
@@ -275,8 +277,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                       key={opt.value}
                       onClick={() => setEvalMode(opt.value)}
                       className={`flex-1 p-3 border text-left text-xs transition-all ${evalMode === opt.value
-                          ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
-                          : 'border-green-900 text-green-700 hover:border-green-600'
+                        ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
+                        : 'border-green-900 text-green-700 hover:border-green-600'
                         }`}
                     >
                       <div className="font-bold mb-1">{opt.label}</div>
@@ -309,8 +311,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                       key={opt.value}
                       onClick={() => setScenarioMode(opt.value)}
                       className={`py-2 px-1 border text-center transition-all ${scenarioMode === opt.value
-                          ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
-                          : 'border-green-900 text-green-700 hover:border-green-600'
+                        ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
+                        : 'border-green-900 text-green-700 hover:border-green-600'
                         }`}
                     >
                       {opt.label}
@@ -329,8 +331,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                           key={s.id}
                           onClick={() => setSelectedScenarioId(s.id)}
                           className={`w-full text-left p-3 border text-xs transition-all ${selectedScenarioId === s.id
-                              ? 'border-hacker-green bg-green-950 bg-opacity-40'
-                              : 'border-green-900 hover:border-green-700'
+                            ? 'border-hacker-green bg-green-950 bg-opacity-40'
+                            : 'border-green-900 hover:border-green-700'
                             }`}
                         >
                           <div className="flex justify-between items-start mb-1">
@@ -463,12 +465,19 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
             {loading
               ? 'INITIALIZING...'
               : tab === 'create'
-                ? playMode === 'PASS_AND_PLAY'
-                  ? '> SPAWN ROOM (PASS & PLAY)'
-                  : playMode === 'SOLO'
-                    ? `> SPAWN ROOM (VS AI — ${humanRole})`
-                    : '> SPAWN ROOM'
-                : '> INFILTRATE'}
+              ? playMode === 'PASS_AND_PLAY'
+                ? '> SPAWN ROOM (PASS & PLAY)'
+                : playMode === 'SOLO'
+                ? `> SPAWN ROOM (VS AI — ${humanRole})`
+                : '> SPAWN ROOM'
+              : '> INFILTRATE'}
+          </button>
+
+          <button
+            onClick={() => setShowRules(true)}
+            className="w-full mt-2 text-green-800 hover:text-hacker-green text-xs tracking-widest transition-colors py-1"
+          >
+            [?] HOW TO PLAY
           </button>
 
           {/* How it works */}
@@ -481,13 +490,15 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                 # {playMode === 'PASS_AND_PLAY'
                   ? 'Pass & Play: share one screen, players take turns in private'
                   : playMode === 'SOLO'
-                    ? `VS AI: you play ${humanRole === 'ATTACKER' ? 'ATTACKER vs an AI Defender' : 'DEFENDER vs an AI Attacker'}`
-                    : 'Multiplayer: share the room code with your opponent'}
+                  ? `VS AI: you play ${humanRole === 'ATTACKER' ? 'ATTACKER vs an AI Defender' : 'DEFENDER vs an AI Attacker'}`
+                  : 'Multiplayer: share the room code with your opponent'}
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {showRules && <RulesScreen onClose={() => setShowRules(false)} />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 export default function StatusBar({
-  roomId, playerId, phase, role, timeRemaining, playerCount, connected, playMode, onLeave
+  roomId, playerId, phase, role, timeRemaining, playerCount, connected, playMode, onLeave, onShowRules
 }) {
   const formatTime = (s) => {
     if (s == null) return '--:--'
@@ -44,9 +44,8 @@ export default function StatusBar({
 
       {/* Center: Timer */}
       {phase === 'DRAFTING' && (
-        <div className={`text-2xl font-bold tabular-nums transition-colors ${
-          isLow ? 'text-hacker-red animate-pulse' : 'text-hacker-green'
-        }`}>
+        <div className={`text-2xl font-bold tabular-nums transition-colors ${isLow ? 'text-hacker-red animate-pulse' : 'text-hacker-green'
+          }`}>
           {formatTime(timeRemaining)}
         </div>
       )}
@@ -61,6 +60,13 @@ export default function StatusBar({
         <span className={`phase-badge ${phaseColors[phase] || ''}`}>
           {phase}
         </span>
+        <button
+          onClick={onShowRules}
+          className="text-green-800 hover:text-hacker-green transition-colors text-xs tracking-widest"
+          title="How to play"
+        >
+          [?]
+        </button>
         <button
           onClick={onLeave}
           className="text-green-900 hover:text-hacker-red transition-colors text-xs tracking-widest"

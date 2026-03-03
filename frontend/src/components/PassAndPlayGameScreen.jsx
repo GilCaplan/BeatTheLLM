@@ -12,6 +12,7 @@ import WaitingLobby from './WaitingLobby.jsx'
 import DraftingScreen from './DraftingScreen.jsx'
 import EvaluatingScreen from './EvaluatingScreen.jsx'
 import ResultsScreen from './ResultsScreen.jsx'
+import RulesScreen from './RulesScreen.jsx'
 
 const P1 = 'Player_1'
 const P2 = 'Player_2'
@@ -23,6 +24,7 @@ export default function PassAndPlayGameScreen({ roomId, onLeave }) {
 
   // Lock screen between turns
   const [handedOver, setHandedOver] = useState(false)
+  const [showRules, setShowRules] = useState(false)
 
   // Use either socket's game state (they're in sync after the first state message)
   const gameState = p1.gameState || p2.gameState
@@ -96,7 +98,10 @@ export default function PassAndPlayGameScreen({ roomId, onLeave }) {
         connected={connected}
         playMode="PASS_AND_PLAY"
         onLeave={onLeave}
+        onShowRules={() => setShowRules(true)}
       />
+
+      {showRules && <RulesScreen onClose={() => setShowRules(false)} />}
 
       <main className="flex-1 p-4">
         {/* Lock screen between turns during DRAFTING */}

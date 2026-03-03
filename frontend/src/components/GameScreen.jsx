@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useGameSocket } from '../hooks/useGameSocket.js'
 import WaitingLobby from './WaitingLobby.jsx'
 import DraftingScreen from './DraftingScreen.jsx'
@@ -5,6 +6,7 @@ import EvaluatingScreen from './EvaluatingScreen.jsx'
 import ResultsScreen from './ResultsScreen.jsx'
 import StatusBar from './StatusBar.jsx'
 import PassAndPlayGate from './PassAndPlayGate.jsx'
+import RulesScreen from './RulesScreen.jsx'
 
 export default function GameScreen({ roomId, playerId, displayName, onLeave }) {
   const {
@@ -26,6 +28,8 @@ export default function GameScreen({ roomId, playerId, displayName, onLeave }) {
   const playerCount = Object.keys(gameState?.players || {}).length
   const playMode = gameState?.play_mode || 'MULTIPLAYER'
   const passAndPlayTurn = gameState?.pass_and_play_turn
+
+  const [showRules, setShowRules] = useState(false)
 
   // Pass-and-play: show a "hand off screen" when it's not this player's turn during DRAFTING
   const isPassAndPlay = playMode === 'PASS_AND_PLAY'
@@ -67,7 +71,10 @@ export default function GameScreen({ roomId, playerId, displayName, onLeave }) {
         connected={connected}
         playMode={playMode}
         onLeave={onLeave}
+        onShowRules={() => setShowRules(true)}
       />
+
+      {showRules && <RulesScreen onClose={() => setShowRules(false)} />}
 
       <main className="flex-1 p-4">
         {/* Pass-and-play handoff gate during drafting */}

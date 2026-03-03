@@ -242,6 +242,36 @@ async def _multiline_input(label: str) -> str:
     return "\n".join(lines)
 
 
+# ── Rules ──────────────────────────────────────────────────────────────────────
+
+def _print_rules() -> None:
+    """Print a concise game rules summary to the terminal."""
+    console.print()
+    console.print(Rule("[bold green]HOW TO PLAY — Jailbreak the AI[/bold green]"))
+    console.print()
+    console.print(Panel(
+        "[bold]Goal[/bold]: One player [blue]DEFENDS[/blue] an AI; the other [red]ATTACKS[/red] it.\n\n"
+        "A scenario gives the AI a character to play. Hidden inside is a "
+        "[yellow]forbidden phrase[/yellow] — a word the AI must never say.\n\n"
+        "[bold blue]🛡 DEFENDER[/bold blue]  Reads the scenario + forbidden phrase. "
+        "Writes an extra system prompt to help the AI resist. "
+        "[bold]Wins[/bold] if the AI never says the phrase.\n\n"
+        "[bold red]⚔ ATTACKER[/bold red]   Sees a hint about the phrase. "
+        "Writes up to 3 prompts to trick the AI into saying it. "
+        "[bold]Wins[/bold] if the AI says (or implies) the phrase.\n\n"
+        "[bold]Round flow[/bold]: LOBBY → DRAFTING (3 min each) → EVALUATING → RESULTS\n\n"
+        "[bold]Scoring[/bold]: All 3 prompts always run. After a success the context resets "
+        "so the next prompt faces a fresh system prompt. Score shown as X/3 at results.\n\n"
+        "[bold]Eval modes[/bold]:\n"
+        "  [green]EXACT[/green]  — fast: checks for the forbidden word verbatim\n"
+        "  [yellow]JUDGE[/yellow]  — thorough: an LLM checks if the concept was expressed",
+        title="[bold green]// Rules[/bold green]",
+        border_style="green",
+        padding=(1, 2),
+    ))
+    console.print()
+
+
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 async def setup() -> tuple[str, str, str]:
@@ -253,7 +283,17 @@ async def setup() -> tuple[str, str, str]:
     console.print("  [green]1[/green]  Create a new MULTIPLAYER room")
     console.print("  [green]2[/green]  Create a SOLO room (play vs the AI)")
     console.print("  [green]3[/green]  Join an existing room with a code")
-    action = Prompt.ask("Choice", choices=["1", "2", "3"])
+    console.print("  [green]r[/green]  Read the rules")
+    action = Prompt.ask("Choice", choices=["1", "2", "3", "r"])
+
+    if action == "r":
+        _print_rules()
+        # Re-prompt after showing rules
+        console.print("[bold]What would you like to do?[/bold]")
+        console.print("  [green]1[/green]  Create a new MULTIPLAYER room")
+        console.print("  [green]2[/green]  Create a SOLO room (play vs the AI)")
+        console.print("  [green]3[/green]  Join an existing room with a code")
+        action = Prompt.ask("Choice", choices=["1", "2", "3"])
 
     # Player name
     default_name = f"player_{uuid.uuid4().hex[:4]}"
@@ -714,7 +754,12 @@ async def game_loop(ws_url: str, room_id: str, player_id: str) -> None:
     console.print(f"\n  [dim]Connecting to {ws_url}...[/dim]")
 
     try:
-        async with websockets.connect(ws_url) as ws:
+        async with websockets.connect(
+            ws_url,
+            ping_interval=20,   # send pings every 20 s
+            ping_timeout=None,  # never close because we didn't get a pong in time
+                                # (typing long prompts blocks the event loop)
+        ) as ws:
             console.print("  [bold green]Connected![/bold green]\n")
 
             # First message is always the initial state
