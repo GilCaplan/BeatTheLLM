@@ -11,7 +11,7 @@ A 2-player local multiplayer web game where players compete to either **protect*
 | 🛡 **Defender** | Write a system prompt that prevents the AI from saying a forbidden phrase |
 | ⚔ **Attacker** | Craft up to 3 consecutive prompts to trick the AI into saying the forbidden phrase |
 
-The game runs the combined prompts through a **local LLM** (TinyLlama by default) and does a case-insensitive string check to declare a winner.
+The game runs the combined prompts through a **local LLM** (Llama-3.2-1B-Instruct by default) and does a case-insensitive string check to declare a winner.
 
 ### Example Scenario
 
@@ -29,7 +29,7 @@ The game runs the combined prompts through a **local LLM** (TinyLlama by default
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python · FastAPI · WebSockets |
-| LLM | HuggingFace `transformers` · TinyLlama-1.1B |
+| LLM | HuggingFace `transformers` · Llama-3.2-1B-Instruct |
 | Frontend | React 18 · Vite · Tailwind CSS |
 | Terminal client | Python · `rich` · `websockets` |
 | Testing | pytest (82 tests, all passing) |
@@ -40,7 +40,7 @@ The game runs the combined prompts through a **local LLM** (TinyLlama by default
 
 - **Python 3.10+**
 - **Node.js 18+**
-- ~2 GB disk space for TinyLlama model weights (downloaded automatically on first run)
+- ~2 GB disk space for Llama-3.2-1B-Instruct model weights (downloaded automatically on first run)
 
 ---
 
@@ -149,7 +149,7 @@ Create `backend/.env` to override defaults:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MOCK_LLM` | `0` | Set to `1` to skip loading model weights (instant, for testing) |
-| `LLM_MODEL` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Any HuggingFace chat model |
+| `LLM_MODEL` | `meta-llama/Llama-3.2-1B-Instruct` | Any HuggingFace chat model |
 
 ---
 
