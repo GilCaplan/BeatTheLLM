@@ -257,6 +257,7 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
     final_output = ""
     overall_concept_breached = False
     overall_task_completed = True
+    prompts_succeeded = 0  # how many individual prompts penetrated the defence
 
     loop = asyncio.get_event_loop()
 
@@ -340,10 +341,11 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
             concept_breached_this_turn = verdict["concept_breached"]
             task_completed_this_turn = verdict["task_completed"]
 
-        # Attacker wins if concept breached OR AI refused the benign task
+        # Attacker wins overall if any prompt succeeds
         turn_attacker_won = concept_breached_this_turn or not task_completed_this_turn
         if turn_attacker_won:
             attacker_won = True
+            prompts_succeeded += 1
 
         # Track overall judge results for telemetry / result display
         if concept_breached_this_turn:
@@ -351,12 +353,18 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
         if not task_completed_this_turn:
             overall_task_completed = False
 
-        conversation.append({"role": "assistant", "content": response})
+        # After a successful penetration, reset conversation context so the next
+        # prompt faces the original system prompt with no memory of the jailbreak.
+        # After a failed prompt, carry the context forward (builds pressure).
+        if turn_attacker_won:
+            conversation = []
+        else:
+            conversation.append({"role": "assistant", "content": response})
         chat_log.append({"role": "user", "content": user_msg})
         chat_log.append({"role": "assistant", "content": response})
         final_output = response
 
-        # Broadcast the complete AI response for this turn (backward compat)
+        # Broadcast the complete AI response for this turn
         await conn_manager.broadcast(room_id, {
             "type": "turn_result",
             "turn": turn_idx,
@@ -367,13 +375,14 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
             "concept_breached": concept_breached_this_turn,
             "task_completed": task_completed_this_turn,
             "forbidden_phrase": forbidden_phrase,
+            "turn_attacker_won": turn_attacker_won,
+            "prompts_succeeded": prompts_succeeded,
+            "context_reset": turn_attacker_won,  # tells clients context was wiped
         })
 
         # Short pause between turns so UI can animate
         await asyncio.sleep(0.4)
-
-        if turn_attacker_won:
-            break  # Early exit — attacker already won
+        # No early exit — all prompts always run
 
     # ── Determine winner ───────────────────────────────────────────────────
     winner_id = loser_id = None
@@ -393,6 +402,7 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
         loser_id=loser_id,
         concept_breached=overall_concept_breached,
         task_completed=overall_task_completed,
+        prompts_succeeded=prompts_succeeded,
     )
     rm.set_result(room_id, result)
 

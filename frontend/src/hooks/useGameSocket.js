@@ -84,10 +84,13 @@ export function useGameSocket(roomId, playerId, displayName) {
           {
             turn: msg.turn,
             total_turns: msg.total_turns,
-            user_msg: msg.user_msg || '',   // may arrive from pendingTurn
+            user_msg: msg.user_msg || '',
             response: msg.response,
             forbidden_found: msg.forbidden_found,
             forbidden_phrase: msg.forbidden_phrase,
+            turn_attacker_won: msg.turn_attacker_won,
+            context_reset: msg.context_reset,
+            prompts_succeeded: msg.prompts_succeeded,
           },
         ])
         break

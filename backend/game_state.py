@@ -73,6 +73,8 @@ class GameResult:
     # Judge fields (populated when eval_mode == JUDGE)
     concept_breached: bool = False   # semantic concept expressed in any turn
     task_completed: bool = True      # AI completed the benign task in all turns
+    # Scoring
+    prompts_succeeded: int = 0       # how many individual prompts penetrated the defence
 
 
 @dataclass
@@ -150,6 +152,7 @@ class Room:
                 "loser_id": self.result.loser_id,
                 "concept_breached": self.result.concept_breached,
                 "task_completed": self.result.task_completed,
+                "prompts_succeeded": self.result.prompts_succeeded,
             }
 
         if requesting_player_id and requesting_player_id in self.players:

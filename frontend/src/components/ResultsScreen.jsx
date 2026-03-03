@@ -17,8 +17,11 @@ export default function ResultsScreen({ gameState, playerId, onPlayAgain, onLeav
   const {
     attacker_won, llm_output, forbidden_phrase, chat_log,
     scenario_setting, defender_prompt, full_system_prompt,
-    winner_id, loser_id,
+    winner_id, loser_id, prompts_succeeded,
   } = result
+
+  // total prompts = half the chat_log entries (user + assistant pairs)
+  const totalPrompts = chat_log ? Math.floor(chat_log.length / 2) : 0
 
   const iWon = winner_id === playerId
   const myRole = gameState?.your_role || players[playerId]?.role
@@ -48,6 +51,40 @@ export default function ResultsScreen({ gameState, playerId, onPlayAgain, onLeav
             : `The AI avoided "${forbidden_phrase}" — the Defender wins!`}
         </div>
       </div>
+
+      {/* Prompt score */}
+      {totalPrompts > 0 && (
+        <div className="terminal-box">
+          <div className="text-xs text-green-700 mb-3 tracking-widest uppercase">// Prompt Score</div>
+          <div className="flex items-center gap-4">
+            <div className={`text-4xl font-bold ${prompts_succeeded === totalPrompts ? 'text-hacker-red'
+                : prompts_succeeded === 0 ? 'text-hacker-green'
+                  : 'text-hacker-yellow'
+              }`}>
+              {prompts_succeeded ?? 0}/{totalPrompts}
+            </div>
+            <div>
+              <div className="text-sm text-green-400">prompts penetrated the defence</div>
+              <div className="text-xs text-green-800 mt-0.5">
+                {prompts_succeeded === 0 && 'Perfect defence — none broke through'}
+                {prompts_succeeded === totalPrompts && 'Perfect attack — every prompt succeeded'}
+                {prompts_succeeded > 0 && prompts_succeeded < totalPrompts && `Context was reset after each success`}
+              </div>
+            </div>
+            <div className="ml-auto flex gap-1">
+              {Array.from({ length: totalPrompts }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-6 h-6 rounded-sm border ${i < (prompts_succeeded ?? 0)
+                      ? 'bg-hacker-red border-hacker-red'
+                      : 'bg-transparent border-green-800'
+                    }`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* System Prompt used (collapsible) */}
       <div className="terminal-box">
@@ -112,15 +149,13 @@ export default function ResultsScreen({ gameState, playerId, onPlayAgain, onLeav
           {(chat_log || []).map((msg, i) => (
             <div
               key={i}
-              className={`p-3 text-sm ${
-                msg.role === 'user'
+              className={`p-3 text-sm ${msg.role === 'user'
                   ? 'border-l-2 border-hacker-red bg-red-950 bg-opacity-20'
                   : 'border-l-2 border-hacker-green bg-green-950 bg-opacity-20'
-              }`}
+                }`}
             >
-              <div className={`text-xs font-bold mb-1 tracking-widest ${
-                msg.role === 'user' ? 'text-hacker-red' : 'text-hacker-green'
-              }`}>
+              <div className={`text-xs font-bold mb-1 tracking-widest ${msg.role === 'user' ? 'text-hacker-red' : 'text-hacker-green'
+                }`}>
                 {msg.role === 'user' ? '[ATTACKER]' : '[AI RESPONSE]'}
               </div>
               <div className={`${msg.role === 'user' ? 'text-red-300' : 'text-green-300'} whitespace-pre-wrap`}>

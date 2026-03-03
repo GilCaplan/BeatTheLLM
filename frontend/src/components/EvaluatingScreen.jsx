@@ -12,6 +12,8 @@ export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTur
   }, [evalTurns, pendingTurn, streamingText])
 
   const allDone = !pendingTurn && evalTurns.length > 0 && evalTurns.length === (totalTurns || evalTurns.length)
+  const latestScore = evalTurns.length > 0 ? (evalTurns[evalTurns.length - 1].prompts_succeeded ?? 0) : 0
+  const total = totalTurns || evalTurns[0]?.total_turns || '?'
 
   return (
     <div className="max-w-3xl mx-auto mt-4 space-y-4">
@@ -20,8 +22,14 @@ export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTur
         <div className={`text-xl font-bold mb-1 ${allDone ? 'text-hacker-green' : 'text-hacker-yellow animate-pulse'}`}>
           {allDone ? '● EVALUATION COMPLETE' : '⚡ RUNNING INFERENCE...'}
         </div>
-        <div className="text-xs text-green-700">
-          {evalTurns.length} / {totalTurns || '?'} turns processed
+        <div className="flex items-center justify-center gap-6 text-xs text-green-700 mt-1">
+          <span>{evalTurns.length} / {total} turns processed</span>
+          {(latestScore > 0 || allDone) && (
+            <span className={`font-bold px-2 py-0.5 border ${latestScore > 0 ? 'text-hacker-red border-hacker-red' : 'text-hacker-green border-hacker-green'
+              }`}>
+              ⚔ {latestScore}/{total} PENETRATED
+            </span>
+          )}
         </div>
       </div>
 
@@ -35,7 +43,7 @@ export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTur
           <TurnBlock key={t.turn} turn={t} />
         ))}
 
-        {/* Pending turn — showing attacker prompt, AI streaming */}
+        {/* Pending turn */}
         {pendingTurn && (
           <PendingTurnBlock turn={pendingTurn} streamingText={streamingText} />
         )}
@@ -63,12 +71,18 @@ export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTur
 
 function TurnBlock({ turn }) {
   const phraseFound = turn.forbidden_found
+  const penetrated = turn.turn_attacker_won
 
   return (
     <div className="space-y-2">
-      {/* Turn label */}
-      <div className="text-xs text-green-800 tracking-widest">
-        — TURN {turn.turn} —
+      {/* Turn label + penetration badge */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-green-800 tracking-widest">— TURN {turn.turn} —</span>
+        {penetrated && (
+          <span className="text-xs font-bold text-hacker-red border border-hacker-red px-1 py-0.5 tracking-widest">
+            ⚠ PENETRATED
+          </span>
+        )}
       </div>
 
       {/* Attacker message */}
@@ -86,6 +100,13 @@ function TurnBlock({ turn }) {
           {highlightForbidden(turn.response, turn.forbidden_phrase)}
         </div>
       </div>
+
+      {/* Context reset notice */}
+      {turn.context_reset && (
+        <div className="text-xs text-hacker-yellow border border-yellow-900 bg-yellow-950 bg-opacity-20 px-3 py-1.5">
+          ↺ Context reset — next prompt starts fresh against the original system prompt
+        </div>
+      )}
     </div>
   )
 }
