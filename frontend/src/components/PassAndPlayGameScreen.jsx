@@ -37,6 +37,7 @@ export default function PassAndPlayGameScreen({ roomId, onLeave }) {
   const connected = p1.connected && p2.connected
   const evalTurns = p1.evalTurns.length ? p1.evalTurns : p2.evalTurns
   const pendingTurn = p1.pendingTurn || p2.pendingTurn
+  const streamingText = p1.streamingText || p2.streamingText
   const totalTurns = evalTurns.length > 0
     ? evalTurns[0].total_turns
     : (pendingTurn?.total_turns || null)
@@ -134,6 +135,7 @@ export default function PassAndPlayGameScreen({ roomId, onLeave }) {
                 evalTurns={evalTurns}
                 pendingTurn={pendingTurn}
                 totalTurns={totalTurns}
+                streamingText={streamingText}
               />
             )}
 
