@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-hacker-dark text-hacker-green font-mono;
+  }
+}
+
+@layer components {
+  .terminal-box {
+    @apply border border-hacker-green bg-black bg-opacity-60 rounded p-4;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2), inset 0 0 10px rgba(0, 255, 65, 0.05);
+  }
+
+  .btn-primary {
+    @apply px-6 py-2 border border-hacker-green text-hacker-green bg-transparent
+           hover:bg-hacker-green hover:text-black transition-all duration-200
+           font-mono font-bold tracking-wider uppercase cursor-pointer;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+  }
+
+  .btn-danger {
+    @apply px-6 py-2 border border-hacker-red text-hacker-red bg-transparent
+           hover:bg-hacker-red hover:text-black transition-all duration-200
+           font-mono font-bold tracking-wider uppercase cursor-pointer;
+    box-shadow: 0 0 8px rgba(233, 69, 96, 0.4);
+  }
+
+  .btn-disabled {
+    @apply px-6 py-2 border border-gray-700 text-gray-700 bg-transparent
+           font-mono font-bold tracking-wider uppercase cursor-not-allowed opacity-50;
+  }
+
+  .terminal-input {
+    @apply w-full bg-black border border-hacker-green text-hacker-green
+           font-mono p-3 focus:outline-none focus:ring-1 focus:ring-hacker-green
+           placeholder-green-900 resize-none;
+    box-shadow: inset 0 0 5px rgba(0, 255, 65, 0.1);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .role-defender {
+    @apply text-blue-400;
+    text-shadow: 0 0 10px #60a5fa;
+  }
+
+  .role-attacker {
+    @apply text-hacker-red;
+    text-shadow: 0 0 10px #e94560;
+  }
+
+  .phase-badge {
+    @apply text-xs px-2 py-1 border font-bold tracking-widest uppercase;
+  }
+}
+
+/* Scanline overlay effect */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
