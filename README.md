@@ -232,6 +232,71 @@ Client → Server                          Server → Client
 
 ---
 
+## Telemetry
+
+Every completed match is **automatically logged** to a local SQLite database at `backend/data/telemetry.db`. No configuration needed — it starts recording the moment you play.
+
+### Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER | Auto-increment primary key |
+| `timestamp` | TEXT | ISO-8601 UTC time of match completion |
+| `scenario_id` | TEXT | ID of the scenario played |
+| `defender_prompt` | TEXT | System prompt written by the Defender |
+| `attacker_prompts` | TEXT | JSON array of the Attacker's prompts |
+| `ai_response` | TEXT | Final AI response text |
+| `concept_breached` | INTEGER | 1 if the AI expressed the forbidden concept (JUDGE mode) |
+| `task_completed` | INTEGER | 1 if the AI completed the benign task |
+| `winner` | TEXT | Player ID of the winner |
+
+### Export & Visualize
+
+```bash
+# Activate the virtual environment first
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+# Install matplotlib (only needed once)
+pip install matplotlib
+
+# 1. CSV only — backend/data/matches.csv
+python backend/export_telemetry.py
+
+# 2. CSV + four PNG charts
+python backend/export_telemetry.py --visualize
+
+# 3. CSV + charts + self-contained HTML report  ← recommended
+python backend/export_telemetry.py --report
+
+# 4. Custom output directory
+python backend/export_telemetry.py --report --out ./reports
+
+# 5. Open charts interactively
+python backend/export_telemetry.py --visualize --show
+```
+
+The **HTML report** (`telemetry_report.html`) is fully self-contained — all four charts are embedded as base64 images, so you can share or open it without needing any assets alongside it.
+
+### Charts included
+
+| Chart | Description |
+|-------|-------------|
+| Win Rate | Overall attacker vs defender win percentage (pie) |
+| Wins per Scenario | Per-scenario win breakdown (horizontal bar) |
+| Outcome Breakdown | Concept breached / task refused / clean response rates (bar) |
+| Win Rate Over Time | Cumulative attacker win rate across matches (line) |
+
+### Standalone Visualizer
+
+```bash
+# Generates PNGs directly (no CSV export)
+python backend/visualize_telemetry.py
+python backend/visualize_telemetry.py --show        # with popups
+python backend/visualize_telemetry.py --out ./out   # custom dir
+```
+
+---
+
 ## License
 
 MIT
