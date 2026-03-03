@@ -71,7 +71,8 @@ export default function PassAndPlayGameScreen({ roomId, onLeave }) {
 
   // ── Play Again ─────────────────────────────────────────────────────────────
   const handlePlayAgain = () => {
-    p1.playAgain()
+    p1.playAgain()   // resets P1: submitted, evalTurns, etc. + sends play_again
+    p2.playAgain()   // resets P2: submitted=false so role-swapped defender isn't stuck
     setHandedOver(false)
   }
 

@@ -40,12 +40,18 @@ export function useGameSocket(roomId, playerId, displayName) {
       case 'phase_change':
         if (msg.room) {
           setGameState(msg.room)
-          // Reset eval state when entering a new phase
+          // Reset eval + submitted state when entering a new phase
           if (msg.room.phase !== 'EVALUATING') {
             setEvalTurns([])
             setPendingTurn(null)
             setAiThinking(false)
             setStreamingText('')
+          }
+          // Reset submitted flag whenever we land back in LOBBY or DRAFTING
+          // so play-again role-swaps don't leave the new defender stuck on a
+          // "waiting for opponent" screen.
+          if (msg.room.phase === 'LOBBY' || msg.room.phase === 'DRAFTING') {
+            setSubmitted(false)
           }
         }
         break
