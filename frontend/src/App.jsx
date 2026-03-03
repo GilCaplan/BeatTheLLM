@@ -30,14 +30,14 @@ export default function App() {
       // No player name needed — P1/P2 are assigned automatically by PassAndPlayGameScreen
       setSession({ roomId: data.room_id, playMode: 'PASS_AND_PLAY' })
     } else {
-      const base = playerName?.trim() || 'Player'
+      const base = playerName?.trim() || 'h4ck3r'
       const playerId = `${base}_${Math.random().toString(36).slice(2, 6)}`
       setSession({ roomId: data.room_id, playerId, displayName: base, playMode: data.play_mode })
     }
   }, [])
 
   const handleJoinRoom = useCallback((roomId, playerName) => {
-    const base = playerName?.trim() || 'Player'
+    const base = playerName?.trim() || 'h4ck3r'
     const playerId = `${base}_${Math.random().toString(36).slice(2, 6)}`
     setSession({ roomId: roomId.trim().toUpperCase(), playerId, displayName: base, playMode: 'MULTIPLAYER' })
   }, [])

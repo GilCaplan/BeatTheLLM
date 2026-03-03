@@ -120,13 +120,12 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
   }
 
   const handleCreate = async () => {
-    if (playMode !== 'PASS_AND_PLAY' && !playerName.trim()) { setError('Enter a handle first.'); return }
     if (scenarioMode === 'pick' && !selectedScenarioId) { setError('Pick a scenario.'); return }
     if (scenarioMode === 'generate' && !generatedScenario) { setError('Generate a scenario first.'); return }
     setLoading(true)
     setError(null)
     try {
-      await onCreateRoom(playerName.trim(), getEffectiveScenarioId(), playMode, humanRole, evalMode)
+      await onCreateRoom(playerName.trim() || 'h4ck3r', getEffectiveScenarioId(), playMode, humanRole, evalMode)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -135,9 +134,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
   }
 
   const handleJoin = () => {
-    if (!playerName.trim()) { setError('Enter a handle first.'); return }
     if (!roomCode.trim()) { setError('Enter a room code.'); return }
-    onJoinRoom(roomCode.trim(), playerName.trim())
+    onJoinRoom(roomCode.trim(), playerName.trim() || 'h4ck3r')
   }
 
   return (
@@ -165,11 +163,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 py-2 text-sm tracking-widest uppercase transition-colors ${
-                  tab === t
+                className={`flex-1 py-2 text-sm tracking-widest uppercase transition-colors ${tab === t
                     ? 'text-hacker-green border-b-2 border-hacker-green'
                     : 'text-green-800 hover:text-green-600'
-                }`}
+                  }`}
               >
                 {t === 'create' ? '[ Create Room ]' : '[ Join Room ]'}
               </button>
@@ -187,7 +184,7 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (tab === 'create' ? handleCreate() : handleJoin())}
-                placeholder="h4ck3r_name"
+                placeholder="h4ck3r"
                 maxLength={20}
                 className="terminal-input"
               />
@@ -225,11 +222,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                     <button
                       key={opt.value}
                       onClick={() => setPlayMode(opt.value)}
-                      className={`flex-1 p-3 border text-left text-xs transition-all ${
-                        playMode === opt.value
+                      className={`flex-1 p-3 border text-left text-xs transition-all ${playMode === opt.value
                           ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
                           : 'border-green-900 text-green-700 hover:border-green-600'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold mb-1">{opt.label}</div>
                       <div className="text-green-800">{opt.desc}</div>
@@ -251,11 +247,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                         <button
                           key={r.value}
                           onClick={() => setHumanRole(r.value)}
-                          className={`flex-1 p-3 border text-left text-xs transition-all ${
-                            humanRole === r.value
+                          className={`flex-1 p-3 border text-left text-xs transition-all ${humanRole === r.value
                               ? r.color
                               : 'border-green-900 text-green-700 hover:border-green-600'
-                          }`}
+                            }`}
                         >
                           <div className="font-bold mb-1">{r.label}</div>
                           <div className="opacity-70">{r.desc}</div>
@@ -279,11 +274,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                     <button
                       key={opt.value}
                       onClick={() => setEvalMode(opt.value)}
-                      className={`flex-1 p-3 border text-left text-xs transition-all ${
-                        evalMode === opt.value
+                      className={`flex-1 p-3 border text-left text-xs transition-all ${evalMode === opt.value
                           ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
                           : 'border-green-900 text-green-700 hover:border-green-600'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold mb-1">{opt.label}</div>
                       <div className="text-green-800">{opt.desc}</div>
@@ -314,11 +308,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                     <button
                       key={opt.value}
                       onClick={() => setScenarioMode(opt.value)}
-                      className={`py-2 px-1 border text-center transition-all ${
-                        scenarioMode === opt.value
+                      className={`py-2 px-1 border text-center transition-all ${scenarioMode === opt.value
                           ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
                           : 'border-green-900 text-green-700 hover:border-green-600'
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -335,11 +328,10 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                         <button
                           key={s.id}
                           onClick={() => setSelectedScenarioId(s.id)}
-                          className={`w-full text-left p-3 border text-xs transition-all ${
-                            selectedScenarioId === s.id
+                          className={`w-full text-left p-3 border text-xs transition-all ${selectedScenarioId === s.id
                               ? 'border-hacker-green bg-green-950 bg-opacity-40'
                               : 'border-green-900 hover:border-green-700'
-                          }`}
+                            }`}
                         >
                           <div className="flex justify-between items-start mb-1">
                             <span className="font-bold text-hacker-green">{s.title}</span>
@@ -471,12 +463,12 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
             {loading
               ? 'INITIALIZING...'
               : tab === 'create'
-              ? playMode === 'PASS_AND_PLAY'
-                ? '> SPAWN ROOM (PASS & PLAY)'
-                : playMode === 'SOLO'
-                ? `> SPAWN ROOM (VS AI — ${humanRole})`
-                : '> SPAWN ROOM'
-              : '> INFILTRATE'}
+                ? playMode === 'PASS_AND_PLAY'
+                  ? '> SPAWN ROOM (PASS & PLAY)'
+                  : playMode === 'SOLO'
+                    ? `> SPAWN ROOM (VS AI — ${humanRole})`
+                    : '> SPAWN ROOM'
+                : '> INFILTRATE'}
           </button>
 
           {/* How it works */}
@@ -489,8 +481,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                 # {playMode === 'PASS_AND_PLAY'
                   ? 'Pass & Play: share one screen, players take turns in private'
                   : playMode === 'SOLO'
-                  ? `VS AI: you play ${humanRole === 'ATTACKER' ? 'ATTACKER vs an AI Defender' : 'DEFENDER vs an AI Attacker'}`
-                  : 'Multiplayer: share the room code with your opponent'}
+                    ? `VS AI: you play ${humanRole === 'ATTACKER' ? 'ATTACKER vs an AI Defender' : 'DEFENDER vs an AI Attacker'}`
+                    : 'Multiplayer: share the room code with your opponent'}
               </p>
             )}
           </div>
