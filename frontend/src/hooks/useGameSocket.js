@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:8000`
 
-export function useGameSocket(roomId, playerId) {
+export function useGameSocket(roomId, playerId, displayName) {
   const [connected, setConnected] = useState(false)
   const [gameState, setGameState] = useState(null)
   const [error, setError] = useState(null)
@@ -12,6 +12,7 @@ export function useGameSocket(roomId, playerId) {
   const [evalTurns, setEvalTurns] = useState([])
   const [pendingTurn, setPendingTurn] = useState(null) // turn currently "thinking"
   const [aiThinking, setAiThinking] = useState(false)  // AI opponent generating
+  const [streamingText, setStreamingText] = useState('') // tokens as they arrive
 
   const wsRef = useRef(null)
 
@@ -19,7 +20,8 @@ export function useGameSocket(roomId, playerId) {
     if (!roomId || !playerId) return
     if (wsRef.current?.readyState === WebSocket.OPEN) return
 
-    const url = `${WS_BASE}/ws/${roomId}/${playerId}`
+    const dn = (displayName || playerId).trim()
+    const url = `${WS_BASE}/ws/${roomId}/${playerId}?display_name=${encodeURIComponent(dn)}`
     const ws = new WebSocket(url)
     wsRef.current = ws
 
@@ -30,7 +32,7 @@ export function useGameSocket(roomId, playerId) {
     }
     ws.onclose = () => setConnected(false)
     ws.onerror = () => setError('WebSocket connection error')
-  }, [roomId, playerId])
+  }, [roomId, playerId, displayName])
 
   const handleMessage = useCallback((msg) => {
     switch (msg.type) {
@@ -43,6 +45,7 @@ export function useGameSocket(roomId, playerId) {
             setEvalTurns([])
             setPendingTurn(null)
             setAiThinking(false)
+            setStreamingText('')
           }
         }
         break
@@ -57,6 +60,7 @@ export function useGameSocket(roomId, playerId) {
 
       // ── Streaming evaluation ───────────────────────────────────────────
       case 'turn_start':
+        setStreamingText('')  // clear any previous streaming text
         setPendingTurn({
           turn: msg.turn,
           total_turns: msg.total_turns,
@@ -64,8 +68,17 @@ export function useGameSocket(roomId, playerId) {
         })
         break
 
+      case 'stream_chunk':
+        setStreamingText((prev) => prev + msg.text)
+        break
+
+      case 'stream_complete':
+        setStreamingText('')  // clear; turn_result will follow
+        break
+
       case 'turn_result':
         setPendingTurn(null)
+        setStreamingText('')
         setEvalTurns((prev) => [
           ...prev,
           {
@@ -114,15 +127,15 @@ export function useGameSocket(roomId, playerId) {
       wsRef.current.send(JSON.stringify(data))
   }, [])
 
-  const sendReady           = useCallback(() => send({ type: 'ready' }), [send])
-  const submitDefender      = useCallback((p) => send({ type: 'submit_defender', system_prompt: p }), [send])
-  const submitAttacker      = useCallback((p) => send({ type: 'submit_attacker', prompts: p }), [send])
-  const playAgain           = useCallback(() => { setSubmitted(false); setError(null); setEvalTurns([]); send({ type: 'play_again' }) }, [send])
+  const sendReady = useCallback(() => send({ type: 'ready' }), [send])
+  const submitDefender = useCallback((p) => send({ type: 'submit_defender', system_prompt: p }), [send])
+  const submitAttacker = useCallback((p) => send({ type: 'submit_attacker', prompts: p }), [send])
+  const playAgain = useCallback(() => { setSubmitted(false); setError(null); setEvalTurns([]); setStreamingText(''); send({ type: 'play_again' }) }, [send])
   const sendPassAndPlayDone = useCallback(() => send({ type: 'pass_and_play_done' }), [send])
 
   return {
     connected, gameState, error, submitted,
-    evalTurns, pendingTurn, aiThinking,
+    evalTurns, pendingTurn, aiThinking, streamingText,
     sendReady, submitDefender, submitAttacker, playAgain, sendPassAndPlayDone,
   }
 }

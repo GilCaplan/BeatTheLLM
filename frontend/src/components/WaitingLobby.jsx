@@ -21,13 +21,11 @@ export default function WaitingLobby({ roomId, gameState, playerId, onReady, onL
 
       {/* Role Assignment */}
       {myRole && (
-        <div className={`terminal-box text-center ${
-          myRole === 'DEFENDER' ? 'border-blue-500' : 'border-hacker-red'
-        }`}>
-          <div className="text-xs text-green-700 mb-2 tracking-widest">YOUR ROLE</div>
-          <div className={`text-3xl font-bold mb-3 ${
-            myRole === 'DEFENDER' ? 'role-defender' : 'role-attacker'
+        <div className={`terminal-box text-center ${myRole === 'DEFENDER' ? 'border-blue-500' : 'border-hacker-red'
           }`}>
+          <div className="text-xs text-green-700 mb-2 tracking-widest">YOUR ROLE</div>
+          <div className={`text-3xl font-bold mb-3 ${myRole === 'DEFENDER' ? 'role-defender' : 'role-attacker'
+            }`}>
             {myRole === 'DEFENDER' ? '🛡 DEFENDER' : '⚔ ATTACKER'}
           </div>
           {myRole === 'DEFENDER' ? (
@@ -90,13 +88,12 @@ export default function WaitingLobby({ roomId, gameState, playerId, onReady, onL
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${info.ready ? 'bg-hacker-green' : 'bg-yellow-600'}`} />
                 <span className={pid === playerId ? 'text-hacker-green' : 'text-green-600'}>
-                  {pid}{pid === playerId ? ' (you)' : ''}
+                  {info.display_name ?? pid}{pid === playerId ? ' (you)' : ''}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-xs ${
-                  info.role === 'DEFENDER' ? 'role-defender' : 'role-attacker'
-                }`}>
+                <span className={`text-xs ${info.role === 'DEFENDER' ? 'role-defender' : 'role-attacker'
+                  }`}>
                   [{info.role || 'UNASSIGNED'}]
                 </span>
                 <span className={`text-xs ${info.ready ? 'text-hacker-green' : 'text-yellow-600'}`}>

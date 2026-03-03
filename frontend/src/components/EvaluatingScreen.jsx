@@ -4,12 +4,12 @@ import { useEffect, useRef } from 'react'
  * EvaluatingScreen — live turn-by-turn chat playback.
  * Each attacker prompt appears, then the AI "thinks", then the response appears.
  */
-export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTurns }) {
+export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTurns, streamingText = '' }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [evalTurns, pendingTurn])
+  }, [evalTurns, pendingTurn, streamingText])
 
   const allDone = !pendingTurn && evalTurns.length > 0 && evalTurns.length === (totalTurns || evalTurns.length)
 
@@ -35,9 +35,9 @@ export default function EvaluatingScreen({ evalTurns = [], pendingTurn, totalTur
           <TurnBlock key={t.turn} turn={t} />
         ))}
 
-        {/* Pending turn — showing attacker prompt, AI thinking */}
+        {/* Pending turn — showing attacker prompt, AI streaming */}
         {pendingTurn && (
-          <PendingTurnBlock turn={pendingTurn} />
+          <PendingTurnBlock turn={pendingTurn} streamingText={streamingText} />
         )}
 
         {/* Empty state */}
@@ -90,7 +90,7 @@ function TurnBlock({ turn }) {
   )
 }
 
-function PendingTurnBlock({ turn }) {
+function PendingTurnBlock({ turn, streamingText = '' }) {
   return (
     <div className="space-y-2 opacity-80">
       <div className="text-xs text-green-800 tracking-widest">
@@ -103,13 +103,20 @@ function PendingTurnBlock({ turn }) {
         <div className="text-red-300 text-sm">{turn.user_msg}</div>
       </div>
 
-      {/* AI thinking */}
+      {/* AI response area — streaming typewriter or dots */}
       <div className="border-l-2 border-hacker-yellow bg-yellow-950 bg-opacity-10 p-3">
         <div className="text-xs font-bold text-hacker-yellow mb-2 tracking-widest">[AI RESPONSE]</div>
-        <div className="flex items-center gap-2">
-          <ThinkingDots />
-          <span className="text-hacker-yellow text-xs">Model processing...</span>
-        </div>
+        {streamingText ? (
+          <div className="text-sm text-yellow-200 whitespace-pre-wrap">
+            {streamingText}
+            <span className="inline-block w-1.5 h-4 bg-hacker-yellow ml-0.5 animate-pulse align-middle" />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <ThinkingDots />
+            <span className="text-hacker-yellow text-xs">Model processing...</span>
+          </div>
+        )}
       </div>
     </div>
   )

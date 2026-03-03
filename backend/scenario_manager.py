@@ -209,6 +209,7 @@ def _normalize_scenario(s: dict) -> dict:
         "description": s.get("system_setting", ""),  # alias for old game_state code
         "difficulty": s.get("difficulty", "Medium"),
         "hint": s.get("hint", ""),
+        "benign_task": s.get("benign_task", "Respond helpfully to the user's question."),
         "source": s.get("source", "built_in"),
     }
 

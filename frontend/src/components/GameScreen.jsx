@@ -6,7 +6,7 @@ import ResultsScreen from './ResultsScreen.jsx'
 import StatusBar from './StatusBar.jsx'
 import PassAndPlayGate from './PassAndPlayGate.jsx'
 
-export default function GameScreen({ roomId, playerId, onLeave }) {
+export default function GameScreen({ roomId, playerId, displayName, onLeave }) {
   const {
     connected,
     gameState,
@@ -14,12 +14,13 @@ export default function GameScreen({ roomId, playerId, onLeave }) {
     submitted,
     evalTurns,
     pendingTurn,
+    streamingText,
     sendReady,
     submitDefender,
     submitAttacker,
     playAgain,
     sendPassAndPlayDone,
-  } = useGameSocket(roomId, playerId)
+  } = useGameSocket(roomId, playerId, displayName)
 
   const phase = gameState?.phase || 'LOBBY'
   const playerCount = Object.keys(gameState?.players || {}).length
@@ -107,6 +108,7 @@ export default function GameScreen({ roomId, playerId, onLeave }) {
               <EvaluatingScreen
                 evalTurns={evalTurns}
                 pendingTurn={pendingTurn}
+                streamingText={streamingText}
                 totalTurns={
                   pendingTurn?.total_turns ||
                   evalTurns[evalTurns.length - 1]?.total_turns

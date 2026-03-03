@@ -37,9 +37,15 @@ class PlayMode(str, Enum):
     SOLO = "SOLO"                    # Human vs AI opponent
 
 
+class EvalMode(str, Enum):
+    EXACT = "EXACT"   # Step 1 only: case-insensitive exact string match (default, fast)
+    JUDGE = "JUDGE"   # Step 1 + Step 2: string match then LLM semantic judge
+
+
 @dataclass
 class PlayerState:
     player_id: str
+    display_name: str = ""   # human-readable label; defaults to player_id if not set
     role: Optional[PlayerRole] = None
     ready: bool = False
     is_ai: bool = False
@@ -47,6 +53,10 @@ class PlayerState:
     system_prompt: str = ""
     # Attacker fields
     attacker_prompts: list = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.display_name:
+            self.display_name = self.player_id
 
 
 @dataclass
@@ -60,6 +70,9 @@ class GameResult:
     full_system_prompt: str = ""  # combined prompt sent to the LLM
     winner_id: Optional[str] = None
     loser_id: Optional[str] = None
+    # Judge fields (populated when eval_mode == JUDGE)
+    concept_breached: bool = False   # semantic concept expressed in any turn
+    task_completed: bool = True      # AI completed the benign task in all turns
 
 
 @dataclass
@@ -71,6 +84,7 @@ class Room:
     time_remaining: int = DRAFTING_SECONDS
     result: Optional[GameResult] = None
     play_mode: PlayMode = PlayMode.MULTIPLAYER
+    eval_mode: EvalMode = EvalMode.EXACT
     # Pass-and-play: whose turn it is to look at the screen
     pass_and_play_turn: Optional[str] = None
     # Solo: the AI player's id (always __ai_bot__ when set)
@@ -107,7 +121,7 @@ class Room:
                 "role": p.role.value if p.role else None,
                 "ready": p.ready,
                 "is_ai": p.is_ai,
-                "display_name": AI_DISPLAY_NAME if p.is_ai else pid,
+                "display_name": AI_DISPLAY_NAME if p.is_ai else p.display_name,
             }
 
         base = {
@@ -117,6 +131,7 @@ class Room:
             "scenario": self.scenario,
             "time_remaining": self.time_remaining,
             "play_mode": self.play_mode.value,
+            "eval_mode": self.eval_mode.value,
             "pass_and_play_turn": self.pass_and_play_turn,
             "ai_player_id": self.ai_player_id,
             "result": None,
@@ -133,6 +148,8 @@ class Room:
                 "full_system_prompt": self.result.full_system_prompt,
                 "winner_id": self.result.winner_id,
                 "loser_id": self.result.loser_id,
+                "concept_breached": self.result.concept_breached,
+                "task_completed": self.result.task_completed,
             }
 
         if requesting_player_id and requesting_player_id in self.players:
@@ -153,19 +170,24 @@ class RoomManager:
         self,
         scenario_id: Optional[str] = None,
         play_mode: PlayMode = PlayMode.MULTIPLAYER,
+        eval_mode: EvalMode = EvalMode.EXACT,
     ) -> Room:
         from scenario_manager import get_random_scenario, get_scenario_by_id
         room_id = str(uuid.uuid4())[:8].upper()
         scenario = (get_scenario_by_id(scenario_id) if scenario_id else None) or get_random_scenario()
-        room = Room(room_id=room_id, scenario=scenario, play_mode=play_mode)
+        room = Room(room_id=room_id, scenario=scenario, play_mode=play_mode, eval_mode=eval_mode)
         self._rooms[room_id] = room
-        logger.info(f"Room {room_id} created | scenario='{scenario['id']}' | mode={play_mode.value}")
+        logger.info(
+            f"Room {room_id} created | scenario='{scenario['id']}' | "
+            f"mode={play_mode.value} | eval={eval_mode.value}"
+        )
         return room
 
     def create_solo_room(
         self,
         human_role: PlayerRole = PlayerRole.ATTACKER,
         scenario_id: Optional[str] = None,
+        eval_mode: EvalMode = EvalMode.EXACT,
     ) -> Room:
         """
         Create a SOLO room (human vs AI).
@@ -176,7 +198,7 @@ class RoomManager:
 
         room_id = str(uuid.uuid4())[:8].upper()
         scenario = (get_scenario_by_id(scenario_id) if scenario_id else None) or get_random_scenario()
-        room = Room(room_id=room_id, scenario=scenario, play_mode=PlayMode.SOLO)
+        room = Room(room_id=room_id, scenario=scenario, play_mode=PlayMode.SOLO, eval_mode=eval_mode)
         room.ai_player_id = AI_PLAYER_ID
 
         ai_role = PlayerRole.ATTACKER if human_role == PlayerRole.DEFENDER else PlayerRole.DEFENDER
@@ -192,7 +214,7 @@ class RoomManager:
     def get_room(self, room_id: str) -> Optional[Room]:
         return self._rooms.get(room_id.upper())
 
-    def join_room(self, room_id: str, player_id: str) -> tuple[Room, PlayerRole]:
+    def join_room(self, room_id: str, player_id: str, display_name: str = "") -> tuple[Room, PlayerRole]:
         """
         Add a human player to a room.
         - MULTIPLAYER/PASS_AND_PLAY: first joiner = DEFENDER, second = ATTACKER.
@@ -223,8 +245,12 @@ class RoomManager:
             existing_human_roles = {p.role for p in room.players.values() if not p.is_ai}
             role = PlayerRole.DEFENDER if PlayerRole.DEFENDER not in existing_human_roles else PlayerRole.ATTACKER
 
-        room.players[player_id] = PlayerState(player_id=player_id, role=role)
-        logger.info(f"Player {player_id} joined room {room_id} as {role.value}")
+        room.players[player_id] = PlayerState(
+            player_id=player_id,
+            display_name=display_name or player_id,
+            role=role,
+        )
+        logger.info(f"Player {player_id} ({display_name or player_id}) joined room {room_id} as {role.value}")
         return room, role
 
     def set_ready(self, room_id: str, player_id: str, ready: bool = True) -> Room:

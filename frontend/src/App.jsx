@@ -9,7 +9,7 @@ export default function App() {
   const [session, setSession] = useState(null)
   // session: { roomId, playerId, playMode, humanRole? }
 
-  const handleCreateRoom = useCallback(async (playerName, scenarioId, playMode, humanRole) => {
+  const handleCreateRoom = useCallback(async (playerName, scenarioId, playMode, humanRole, evalMode) => {
     const res = await fetch(`${API_BASE}/api/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -17,6 +17,7 @@ export default function App() {
         scenario_id: scenarioId || null,
         play_mode: playMode || 'MULTIPLAYER',
         human_role: humanRole || 'ATTACKER',
+        eval_mode: evalMode || 'EXACT',
       }),
     })
     if (!res.ok) {
@@ -31,14 +32,14 @@ export default function App() {
     } else {
       const base = playerName?.trim() || 'Player'
       const playerId = `${base}_${Math.random().toString(36).slice(2, 6)}`
-      setSession({ roomId: data.room_id, playerId, playMode: data.play_mode })
+      setSession({ roomId: data.room_id, playerId, displayName: base, playMode: data.play_mode })
     }
   }, [])
 
   const handleJoinRoom = useCallback((roomId, playerName) => {
     const base = playerName?.trim() || 'Player'
     const playerId = `${base}_${Math.random().toString(36).slice(2, 6)}`
-    setSession({ roomId: roomId.trim().toUpperCase(), playerId, playMode: 'MULTIPLAYER' })
+    setSession({ roomId: roomId.trim().toUpperCase(), playerId, displayName: base, playMode: 'MULTIPLAYER' })
   }, [])
 
   const handleLeave = useCallback(() => setSession(null), [])
@@ -55,6 +56,7 @@ export default function App() {
     <GameScreen
       roomId={session.roomId}
       playerId={session.playerId}
+      displayName={session.displayName}
       onLeave={handleLeave}
     />
   )

@@ -20,14 +20,16 @@ WebSocket message protocol (JSON):
     { "type": "pass_and_play_done" }
 
   Server -> Client:
-    { "type": "state",        "room": {...} }
-    { "type": "phase_change", "phase": "...", "room": {...} }
-    { "type": "tick",         "time_remaining": N }
-    { "type": "submitted",    "role": "DEFENDER"|"ATTACKER" }
-    { "type": "turn_start",   "turn": N, "total_turns": N, "user_msg": "..." }
-    { "type": "turn_result",  "turn": N, "response": "...", "forbidden_found": bool }
-    { "type": "player_left",  "message": "..." }
-    { "type": "error",        "message": "..." }
+    { "type": "state",          "room": {...} }
+    { "type": "phase_change",   "phase": "...", "room": {...} }
+    { "type": "tick",           "time_remaining": N }
+    { "type": "submitted",      "role": "DEFENDER"|"ATTACKER" }
+    { "type": "turn_start",     "turn": N, "total_turns": N, "user_msg": "..." }
+    { "type": "stream_chunk",   "turn": N, "text": "..." }
+    { "type": "stream_complete","turn": N }
+    { "type": "turn_result",    "turn": N, "response": "...", "forbidden_found": bool }
+    { "type": "player_left",    "message": "..." }
+    { "type": "error",          "message": "..." }
 """
 import asyncio
 import json
@@ -40,6 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from game_state import (
+    EvalMode,
     GamePhase,
     GameResult,
     PlayMode,
@@ -48,7 +51,15 @@ from game_state import (
     room_manager,
     DRAFTING_SECONDS,
 )
-from llm_handler import check_forbidden_phrase, run_inference_multiturn, mock_think, MOCK_LLM
+from llm_handler import (
+    check_forbidden_phrase,
+    create_turn_streamer,
+    judge_output,
+    run_inference_multiturn,
+    mock_think,
+    MOCK_LLM,
+    MOCK_STREAM_DELAY,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -222,6 +233,8 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
 
     forbidden_words = room.scenario.get("forbidden_words", [])
     forbidden_phrase = room.scenario.get("forbidden_phrase", forbidden_words[0] if forbidden_words else "")
+    benign_task = room.scenario.get("benign_task", "Respond helpfully to the user's question.")
+    eval_mode = room.eval_mode
 
     # Always start with the scenario's base setting, then layer the defender's
     # custom restrictions on top. This ensures the character persona is preserved.
@@ -233,7 +246,7 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
 
     total_turns = len(attacker_prompts)
     logger.info(
-        f"Room {room_id}: evaluating {total_turns} turn(s) | "
+        f"Room {room_id}: evaluating {total_turns} turn(s) | eval={eval_mode.value} | "
         f"defender_extra={len(defender_extra)} chars | "
         f"full_system_prompt={len(full_system_prompt)} chars"
     )
@@ -242,20 +255,18 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
     chat_log = []
     attacker_won = False
     final_output = ""
+    overall_concept_breached = False
+    overall_task_completed = True
 
-    # ── Stream turn by turn ────────────────────────────────────────────────
-    # Run all turns' inference in a thread to not block the event loop on real LLM
     loop = asyncio.get_event_loop()
 
-    try:
-        responses = await loop.run_in_executor(
-            None, run_inference_multiturn, system_prompt, attacker_prompts
-        )
-    except Exception as e:
-        logger.error(f"LLM inference failed: {e}")
-        responses = [f"[ERROR: {e}]"] * total_turns
+    # ── Stream turn by turn ────────────────────────────────────────────────
+    conversation: list[dict] = []
 
-    for turn_idx, (user_msg, response) in enumerate(zip(attacker_prompts, responses), start=1):
+    for turn_idx, user_msg in enumerate(attacker_prompts, start=1):
+        # Build conversation history up to this turn
+        conversation.append({"role": "user", "content": user_msg})
+
         # Announce the attacker's prompt
         await conn_manager.broadcast(room_id, {
             "type": "turn_start",
@@ -264,32 +275,104 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
             "user_msg": user_msg,
         })
 
-        # In MOCK mode, add a small delay so players see each turn appear
-        if MOCK_LLM:
-            await mock_think()
+        # ── Stream tokens from the LLM ─────────────────────────────────────
+        # create_turn_streamer is a blocking generator; we bridge it to asyncio
+        # via a Queue so the event loop stays unblocked between chunks.
+        import queue as _queue
+        token_queue: _queue.Queue = _queue.Queue()
+        DONE_SENTINEL = object()
 
-        found_this_turn = check_forbidden_phrase(response, forbidden_phrase)
-        if found_this_turn:
+        def _stream_worker(sys_p, conv):
+            """Run in a thread: push chunks into token_queue."""
+            try:
+                for chunk in create_turn_streamer(sys_p, list(conv)):
+                    token_queue.put(chunk)
+            except Exception as exc:
+                token_queue.put(f"[STREAM ERROR: {exc}]")
+            finally:
+                token_queue.put(DONE_SENTINEL)
+
+        stream_future = loop.run_in_executor(
+            None, _stream_worker, system_prompt, conversation.copy()
+        )
+
+        response_parts: list[str] = []
+        while True:
+            # Poll the queue with a tiny timeout so asyncio tasks can intersperse
+            try:
+                chunk = await loop.run_in_executor(
+                    None, token_queue.get, True, 0.05   # block=True, timeout=0.05s
+                )
+            except _queue.Empty:
+                continue
+
+            if chunk is DONE_SENTINEL:
+                break
+
+            response_parts.append(chunk)
+            await conn_manager.broadcast(room_id, {
+                "type": "stream_chunk",
+                "turn": turn_idx,
+                "text": chunk,
+            })
+
+        await stream_future  # ensure the thread has fully exited
+
+        response = "".join(response_parts)
+
+        # Signal to clients that streaming for this turn is finished
+        await conn_manager.broadcast(room_id, {
+            "type": "stream_complete",
+            "turn": turn_idx,
+        })
+
+        # ── Step 1: exact string match (always) ───────────────────────────
+        word_found = check_forbidden_phrase(response, forbidden_phrase)
+
+        # ── Step 2: LLM semantic judge (JUDGE mode only, when step 1 missed)
+        concept_breached_this_turn = word_found
+        task_completed_this_turn = True
+
+        if eval_mode == EvalMode.JUDGE and not word_found:
+            verdict = await loop.run_in_executor(
+                None, judge_output, response, forbidden_words, benign_task
+            )
+            concept_breached_this_turn = verdict["concept_breached"]
+            task_completed_this_turn = verdict["task_completed"]
+
+        # Attacker wins if concept breached OR AI refused the benign task
+        turn_attacker_won = concept_breached_this_turn or not task_completed_this_turn
+        if turn_attacker_won:
             attacker_won = True
 
+        # Track overall judge results for telemetry / result display
+        if concept_breached_this_turn:
+            overall_concept_breached = True
+        if not task_completed_this_turn:
+            overall_task_completed = False
+
+        conversation.append({"role": "assistant", "content": response})
         chat_log.append({"role": "user", "content": user_msg})
         chat_log.append({"role": "assistant", "content": response})
         final_output = response
 
-        # Broadcast the AI's response for this turn
+        # Broadcast the complete AI response for this turn (backward compat)
         await conn_manager.broadcast(room_id, {
             "type": "turn_result",
             "turn": turn_idx,
             "total_turns": total_turns,
             "response": response,
-            "forbidden_found": found_this_turn,
+            "user_msg": user_msg,
+            "forbidden_found": word_found,
+            "concept_breached": concept_breached_this_turn,
+            "task_completed": task_completed_this_turn,
             "forbidden_phrase": forbidden_phrase,
         })
 
         # Short pause between turns so UI can animate
         await asyncio.sleep(0.4)
 
-        if found_this_turn:
+        if turn_attacker_won:
             break  # Early exit — attacker already won
 
     # ── Determine winner ───────────────────────────────────────────────────
@@ -308,8 +391,26 @@ async def _evaluate_room(room_id: str, rm: RoomManager) -> None:
         full_system_prompt=full_system_prompt,
         winner_id=winner_id,
         loser_id=loser_id,
+        concept_breached=overall_concept_breached,
+        task_completed=overall_task_completed,
     )
     rm.set_result(room_id, result)
+
+    # ── Telemetry ──────────────────────────────────────────────────────────
+    try:
+        from telemetry import log_match
+        log_match(
+            scenario_id=room.scenario.get("id", "unknown"),
+            defender_prompt=defender_extra,
+            attacker_prompts=attacker_prompts,
+            ai_response=final_output,
+            concept_breached=overall_concept_breached,
+            task_completed=overall_task_completed,
+            winner=winner_id or ("attacker" if attacker_won else "defender"),
+        )
+    except Exception as _tel_err:
+        logger.warning(f"Telemetry logging failed (non-fatal): {_tel_err}")
+
     await conn_manager.broadcast_phase(room_id, "RESULTS", room)
 
 
@@ -342,6 +443,7 @@ class CreateRoomRequest(BaseModel):
     scenario_id: str | None = None
     play_mode: str = "MULTIPLAYER"
     human_role: str = "ATTACKER"   # for SOLO mode: "DEFENDER" or "ATTACKER"
+    eval_mode: str = "EXACT"       # "EXACT" (word match only) or "JUDGE" (+ LLM judge)
 
 
 class CustomScenarioRequest(BaseModel):
@@ -368,21 +470,29 @@ async def create_room(body: CreateRoomRequest = None):
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid play_mode: {body.play_mode}")
 
+    try:
+        eval_mode = EvalMode(body.eval_mode)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid eval_mode: {body.eval_mode}")
+
     if mode == PlayMode.SOLO:
         try:
             human_role = PlayerRole(body.human_role)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid human_role: {body.human_role}")
         room = room_manager.create_solo_room(
-            human_role=human_role, scenario_id=body.scenario_id
+            human_role=human_role, scenario_id=body.scenario_id, eval_mode=eval_mode
         )
     else:
-        room = room_manager.create_room(scenario_id=body.scenario_id, play_mode=mode)
+        room = room_manager.create_room(
+            scenario_id=body.scenario_id, play_mode=mode, eval_mode=eval_mode
+        )
 
     return {
         "room_id": room.room_id,
         "scenario": room.scenario,
         "play_mode": mode.value,
+        "eval_mode": eval_mode.value,
     }
 
 
@@ -466,15 +576,19 @@ async def generate_scenario(body: GenerateScenarioRequest):
 async def websocket_endpoint(ws: WebSocket, room_id: str, player_id: str):
     await ws.accept()
 
+    # Optional display_name query param — lets clients pass a human-friendly
+    # label even when the player_id has a collision-avoidance suffix appended.
+    display_name = ws.query_params.get("display_name", "").strip() or player_id
+
     try:
-        room, role = room_manager.join_room(room_id, player_id)
+        room, role = room_manager.join_room(room_id, player_id, display_name=display_name)
     except ValueError as e:
         await ws.send_json({"type": "error", "message": str(e)})
         await ws.close()
         return
 
     conn_manager.add(room_id, player_id, ws)
-    logger.info(f"WS connected: player={player_id} room={room_id} role={role.value}")
+    logger.info(f"WS connected: player={player_id} display={display_name} room={room_id} role={role.value}")
 
     # Send personalised initial state to this player
     await ws.send_json({"type": "state", "room": room.to_dict(player_id)})
@@ -567,6 +681,7 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, player_id: str):
                     room.result = None
                     room.time_remaining = DRAFTING_SECONDS
                     room.pass_and_play_turn = None
+                    # eval_mode persists across rematches
 
                     for p in room.players.values():
                         if not p.is_ai:

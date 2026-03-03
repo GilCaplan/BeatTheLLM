@@ -259,6 +259,7 @@ async def setup() -> tuple[str, str, str]:
     default_name = f"player_{uuid.uuid4().hex[:4]}"
     raw_name = Prompt.ask("\nYour player name", default=default_name)
     player_id = raw_name.strip().replace(" ", "_")[:20] or default_name
+    display_name = player_id   # kept clean even if we add a collision suffix later
 
     if action == "1":
         scenario_id = await _pick_scenario()
@@ -307,8 +308,9 @@ async def setup() -> tuple[str, str, str]:
             new_id = f"{player_id}_{uuid.uuid4().hex[:4]}"
             console.print(
                 f"  [yellow]Name '{escape(player_id)}' is already taken in this room — "
-                f"playing as '[bold]{escape(new_id)}[/bold]'[/yellow]"
+                f"connecting as '[bold]{escape(player_id)}[/bold]' (unique session)[/yellow]"
             )
+            # display_name stays as the original; only the ws key changes
             player_id = new_id
 
         play_mode = room_info.get("play_mode", "MULTIPLAYER")
@@ -316,7 +318,7 @@ async def setup() -> tuple[str, str, str]:
             console.print("[bold red]This is a Pass & Play room — not supported in terminal mode.[/bold red]")
             sys.exit(1)
 
-    ws_url = f"{WS_BASE}/ws/{room_id}/{player_id}"
+    ws_url = f"{WS_BASE}/ws/{room_id}/{player_id}?display_name={display_name}"
     return room_id, player_id, ws_url
 
 
@@ -495,8 +497,14 @@ async def drafting_phase(ws, room: dict, player_id: str) -> dict:
 
 async def evaluating_phase(ws, room: dict) -> dict:
     """
-    Stream turn_start / turn_result pairs as a live conversation.
-    Highlights the forbidden phrase if found.
+    Stream turn_start / stream_chunk / stream_complete / turn_result messages
+    as a live conversation.
+
+    stream_chunk tokens are written inline (sys.stdout.write + flush) so the AI
+    response appears character-by-character in the terminal.  stream_complete
+    ends the streaming line.  turn_result performs the final formatted display
+    with forbidden-phrase highlighting.
+
     Returns updated room dict once RESULTS phase arrives.
     """
     console.print()
@@ -504,6 +512,8 @@ async def evaluating_phase(ws, room: dict) -> dict:
     console.print("  [dim]Attack prompts are being sent to the AI one by one...[/dim]\n")
 
     broke_early = False
+    streaming_active = False  # True while we are mid-stream for a turn
+
     while True:
         msg = await _recv(ws)
         mtype = msg.get("type")
@@ -518,32 +528,51 @@ async def evaluating_phase(ws, room: dict) -> dict:
             for line in user_msg.splitlines() or [user_msg]:
                 console.print(f"  [yellow]│[/yellow]  {escape(line)}")
             console.print(f"  [bold yellow]├─ [AI RESPONSE] {'─' * 47}[/bold yellow]")
+            # Print the response prefix — tokens will stream inline after this
+            sys.stdout.write("  │  ")
+            sys.stdout.flush()
+            streaming_active = True
+
+        elif mtype == "stream_chunk":
+            if streaming_active:
+                sys.stdout.write(msg.get("text", ""))
+                sys.stdout.flush()
+
+        elif mtype == "stream_complete":
+            if streaming_active:
+                # End the streaming line
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+                streaming_active = False
 
         elif mtype == "turn_result":
             response       = msg.get("response", "")
             forbidden_found = msg.get("forbidden_found", False)
             forbidden_phrase = msg.get("forbidden_phrase", "")
 
+            # If we somehow missed stream events, print the response now
+            if not streaming_active and not response:
+                pass  # nothing extra to print
+            elif streaming_active:
+                # Fallback: stream events didn't arrive, print response directly
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+                streaming_active = False
+                for line in response.splitlines() or [response]:
+                    console.print(f"  [yellow]│[/yellow]  {escape(line)}")
+
+            # Show forbidden-phrase highlight and close the turn box
             if forbidden_found and forbidden_phrase:
-                # Case-insensitive highlight of the forbidden phrase
-                def _highlight(m: re.Match) -> str:
-                    return f"[bold red]{escape(m.group())}[/bold red]"
-                display = re.sub(
-                    re.escape(forbidden_phrase), _highlight, response, flags=re.IGNORECASE
+                console.print(
+                    f"  [bold yellow]└{'─' * 60}[/bold yellow]"
                 )
-            else:
-                display = escape(response)
-
-            for line in (display.splitlines() or [display]):
-                console.print(f"  [yellow]│[/yellow]  {line}")
-            console.print(f"  [bold yellow]└{'─' * 60}[/bold yellow]")
-
-            if forbidden_found:
                 console.print(
                     f"\n  [bold red]⚡  JAILBREAK! The AI said \"{escape(forbidden_phrase)}\"![/bold red]"
                 )
                 broke_early = True
                 break
+            else:
+                console.print(f"  [bold yellow]└{'─' * 60}[/bold yellow]")
 
         elif mtype == "phase_change":
             if msg.get("phase") == "RESULTS":

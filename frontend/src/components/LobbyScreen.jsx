@@ -18,6 +18,7 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
   // Room creation options
   const [playMode, setPlayMode] = useState('MULTIPLAYER') // 'MULTIPLAYER' | 'PASS_AND_PLAY' | 'SOLO'
   const [humanRole, setHumanRole] = useState('ATTACKER')  // for SOLO
+  const [evalMode, setEvalMode] = useState('EXACT')       // 'EXACT' | 'JUDGE'
   const [scenarioMode, setScenarioMode] = useState('random') // 'random' | 'pick' | 'generate' | 'custom'
   const [selectedScenarioId, setSelectedScenarioId] = useState(null)
   const [scenarios, setScenarios] = useState([])
@@ -125,7 +126,7 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
     setLoading(true)
     setError(null)
     try {
-      await onCreateRoom(playerName.trim(), getEffectiveScenarioId(), playMode, humanRole)
+      await onCreateRoom(playerName.trim(), getEffectiveScenarioId(), playMode, humanRole, evalMode)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -261,6 +262,39 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom }) {
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Evaluation Mode */}
+              <div className="mb-4">
+                <label className="block text-xs text-green-600 mb-2 tracking-widest uppercase">
+                  &gt; Evaluation Mode
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 'EXACT', label: '⚡ Word Match', desc: 'Fast exact string check (default)' },
+                    { value: 'JUDGE', label: '🧠 + LLM Judge', desc: 'Semantic check + task completion' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEvalMode(opt.value)}
+                      className={`flex-1 p-3 border text-left text-xs transition-all ${
+                        evalMode === opt.value
+                          ? 'border-hacker-green bg-green-950 bg-opacity-30 text-hacker-green'
+                          : 'border-green-900 text-green-700 hover:border-green-600'
+                      }`}
+                    >
+                      <div className="font-bold mb-1">{opt.label}</div>
+                      <div className="text-green-800">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                {evalMode === 'JUDGE' && (
+                  <div className="mt-2 text-xs text-green-800 border border-green-900 p-2">
+                    # LLM Judge checks if the AI expressed the forbidden concept semantically,
+                    even without exact wording. Also penalises overly restrictive defence prompts
+                    that cause the AI to refuse the benign task.
                   </div>
                 )}
               </div>
